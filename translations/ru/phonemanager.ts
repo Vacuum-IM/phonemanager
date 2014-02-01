@@ -169,6 +169,21 @@
     </message>
 </context>
 <context>
+    <name>PhoneDialerDialog</name>
+    <message>
+        <source>Calls</source>
+        <translation>Звонки</translation>
+    </message>
+    <message>
+        <source>Call</source>
+        <translation>Позвонить</translation>
+    </message>
+    <message>
+        <source>Full history of calls</source>
+        <translation>Полная история звонков</translation>
+    </message>
+</context>
+<context>
     <name>PhoneManager</name>
     <message>
         <source>Phone Manager</source>

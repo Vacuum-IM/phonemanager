@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sounddef>
+  <file>
+    <key>phonemanagerCallRingIn</key>
+    <object mime='sound/wav'>phonemanager-call-ring-in.wav</object>
+  </file>
+  <file>
+    <key>phonemanagerCallRingOut</key>
+    <object mime='sound/wav'>phonemanager-call-ring-out.wav</object>
+  </file>
+  <file>
+    <key>phonemanagerCallRingBusy</key>
+    <object mime='sound/wav'>phonemanager-call-ring-busy.wav</object>
+  </file>
+</sounddef>

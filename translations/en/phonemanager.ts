@@ -169,6 +169,21 @@
     </message>
 </context>
 <context>
+    <name>PhoneDialerDialog</name>
+    <message>
+        <source>Calls</source>
+        <translation>Calls</translation>
+    </message>
+    <message>
+        <source>Call</source>
+        <translation>Call</translation>
+    </message>
+    <message>
+        <source>Full history of calls</source>
+        <translation>Full history of calls</translation>
+    </message>
+</context>
+<context>
     <name>PhoneManager</name>
     <message>
         <source>Phone Manager</source>
