@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<icondef>
+  <icon>
+    <key>phonemanagerCall</key>
+    <object mime="image/png">phonemanagercall.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallIn</key>
+    <object mime="image/png">phonemanagercallin.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallOut</key>
+    <object mime="image/png">phonemanagercallout.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallError</key>
+    <object mime="image/png">phonemanagercallerror.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerBackground</key>
+    <object mime="image/png">phonemanagerbackground.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonHover</key>
+    <object mime="image/png">phonemanagerbuttonhover.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonPressed</key>
+    <object mime="image/png">phonemanagerbuttonpressed.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonAccept</key>
+    <object mime="image/png">phonemanagerbuttonaccept.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonAcceptHover</key>
+    <object mime="image/png">phonemanagerbuttonaccepthover.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonAcceptPressed</key>
+    <object mime="image/png">phonemanagerbuttonacceptpressed.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonReject</key>
+    <object mime="image/png">phonemanagerbuttonreject.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonRejectHover</key>
+    <object mime="image/png">phonemanagerbuttonrejecthover.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerButtonRejectPressed</key>
+    <object mime="image/png">phonemanagerbuttonrejectpressed.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVolumeHandle</key>
+    <object mime="image/png">phonemanagervolumehandle.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVideoCall</key>
+    <object mime="image/png">phonemanagervideocall.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVideoResize</key>
+    <object mime="image/png">phonemanagervideoresize.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVideoWait</key>
+    <object mime="image/gif">phonemanagervideowait.gif</object>
+  </icon>
+  <icon>
+    <key>phonemanagerNumberAppend</key>
+    <object mime="image/png">phonemanagernumberappend.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerNumberRemove</key>
+    <object mime="image/png">phonemanagernumberremove.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerNumberSave</key>
+    <object mime="image/png">phonemanagernumbersave.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerNumberCancel</key>
+    <object mime="image/png">phonemanagernumbercancel.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialerDialog</key>
+    <object mime="image/png">phonemanagerdialerdialog.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallTimer</key>
+    <object mime="image/png">phonemanagercalltimer.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallAnswer</key>
+    <object mime="image/png">phonemanagercallanswer.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallReject</key>
+    <object mime="image/png">phonemanagercallreject.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallHangup</key>
+    <object mime="image/png">phonemanagercallhangup.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer1</key>
+    <object mime="image/png">phonemanagerdialer1.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer2</key>
+    <object mime="image/png">phonemanagerdialer2.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer3</key>
+    <object mime="image/png">phonemanagerdialer3.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer4</key>
+    <object mime="image/png">phonemanagerdialer4.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer5</key>
+    <object mime="image/png">phonemanagerdialer5.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer6</key>
+    <object mime="image/png">phonemanagerdialer6.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer7</key>
+    <object mime="image/png">phonemanagerdialer7.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer8</key>
+    <object mime="image/png">phonemanagerdialer8.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer9</key>
+    <object mime="image/png">phonemanagerdialer9.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer10</key>
+    <object mime="image/png">phonemanagerdialer10.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer11</key>
+    <object mime="image/png">phonemanagerdialer11.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialer12</key>
+    <object mime="image/png">phonemanagerdialer12.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCallHistoryClear</key>
+    <object mime="image/png">phonemanagercallhistoryclear.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialerEnabled</key>
+    <object mime="image/png">phonemanagerdialerenabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerDialerDisabled</key>
+    <object mime="image/png">phonemanagerdialerdisabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCameraEnabled</key>
+    <object mime="image/png">phonemanagercameraenabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerCameraDisabled</key>
+    <object mime="image/png">phonemanagercameradisabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerMicrophoneEnabled</key>
+    <object mime="image/png">phonemanagermicrophoneenabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerMicrophoneDisabled</key>
+    <object mime="image/png">phonemanagermicrophonedisabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVideoPreviewEnabled</key>
+    <object mime="image/png">phonemanagervideopreviewenabled.png</object>
+  </icon>
+  <icon>
+    <key>phonemanagerVideoPreviewDisabled</key>
+    <object mime="image/png">phonemanagervideopreviewdisabled.png</object>
+  </icon>
+</icondef>
