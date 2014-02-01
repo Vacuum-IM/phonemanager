@@ -10,7 +10,7 @@ HEADERS = phonemanager.h \
           phonecallwidget.h \
           incomingcalldialog.h \
           dialerwidget.h \
-          phonedialerdialor.h \
+          phonedialerdialog.h \
           phonecallwindow.h \
           callhistoryworker.h \
           callhistoryviewwidget.h \
@@ -30,7 +30,7 @@ SOURCES = phonemanager.cpp \
           phonecallwidget.cpp \
           incomingcalldialog.cpp \
           dialerwidget.cpp \
-          phonedialerdialor.cpp \
+          phonedialerdialog.cpp \
           phonecallwindow.cpp \
           callhistoryworker.cpp \
           callhistoryviewwidget.cpp \
@@ -43,6 +43,6 @@ FORMS   = editnumberswidget.ui \
           callcontrolwidget.ui \
           incomingcalldialog.ui \
           dialerwidget.ui \
-          phonedialerdialor.ui \
+          phonedialerdialog.ui \
           callhistorywindow.ui \
           sipaccountoptionswidget.ui
