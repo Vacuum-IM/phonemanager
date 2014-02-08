@@ -17,8 +17,9 @@
 #include <definitions/phonemanager/notificationtypes.h>
 #include <definitions/phonemanager/notificationtypeorders.h>
 #include <definitions/phonemanager/messageeditsendhandlerorders.h>
-#include <utils/options.h>
 #include <utils/widgetmanager.h>
+#include <utils/options.h>
+#include <utils/logger.h>
 
 #define DIR_PHONE                   "phone"
 #define FILE_NUMBERS                "numbers.xml"
@@ -76,8 +77,9 @@ void PhoneManager::pluginInfo(IPluginInfo *APluginInfo)
 	APluginInfo->description = tr("Allows to call and send SMS messages to phones");
 	APluginInfo->version = "1.0";
 	APluginInfo->author = "Potapov S.A. aka Lion";
-	APluginInfo->homePage = "http://www.qip.ru";
+	APluginInfo->homePage = "http://www.vacuum-im.org";
 	APluginInfo->dependences.append(ROSTER_UUID);
+	APluginInfo->dependences.append(SIPPHONE_UUID);
 }
 
 bool PhoneManager::initConnections(IPluginManager *APluginManager, int &AInitOrder)
@@ -206,7 +208,7 @@ bool PhoneManager::initConnections(IPluginManager *APluginManager, int &AInitOrd
 	connect(Options::instance(),SIGNAL(optionsClosed()),SLOT(onOptionsClosed()));
 	connect(Options::instance(),SIGNAL(optionsChanged(const OptionsNode &)),SLOT(onOptionsChanged(const OptionsNode &)));
 
-	return FRosterPlugin!=NULL;
+	return FRosterPlugin!=NULL && FSipPhone!=NULL;
 }
 
 bool PhoneManager::initObjects()
@@ -222,6 +224,7 @@ bool PhoneManager::initObjects()
 		{
 			IDiscoFeature phone;
 			phone.active = true;
+			phone.icon = IconStorage::staticStorage(RSR_STORAGE_MENUICONS)->getIcon(MNI_PHONEMANAGER_CALL);
 			phone.var = NS_VACUUM_SIP_PHONE;
 			phone.name = tr("SIP Phone");
 			phone.description = tr("Voice and video calls over SIP");
@@ -297,23 +300,29 @@ bool PhoneManager::stanzaReadWrite(int AHandleId, const Jid &AStreamJid, Stanza 
 			QString remoteUri = actionElem.text();
 			bool withVideo = QVariant(actionElem.attribute("video")).toBool();
 
+			LOG_STRM_INFO(AStreamJid,QString("Phone call request received, from=%1, uri=%2, video=%3, call=%4").arg(AStanza.from(),remoteUri).arg(withVideo).arg(callId));
+
 			if (callId.isEmpty())
 			{
+				LOG_STRM_WARNING(AStreamJid,QString("Invalid phone call request received from=%1: Call id is empty").arg(AStanza.from()));
 				Stanza error = FStanzaProcessor->makeReplyError(AStanza,XmppStanzaError::EC_BAD_REQUEST);
 				FStanzaProcessor->sendStanzaOut(AStreamJid,error);
 			}
 			else if (findCallById(callId) != NULL)
 			{
+				LOG_STRM_WARNING(AStreamJid,QString("Invalid phone call request received from=%1, call=%2: Duplicate call id").arg(AStanza.from(),callId));
 				Stanza error = FStanzaProcessor->makeReplyError(AStanza,XmppStanzaError::EC_CONFLICT);
 				FStanzaProcessor->sendStanzaOut(AStreamJid,error);
 			}
 			else if (!processIncomingCall(AStreamJid,callId,AStanza.from(),remoteUri,withVideo))
 			{
+				LOG_STRM_WARNING(AStreamJid,QString("Failed to process phone call request from=%1, call=%2").arg(AStanza.from(),callId));
 				Stanza error = FStanzaProcessor->makeReplyError(AStanza,XmppStanzaError::EC_NOT_ACCEPTABLE);
 				FStanzaProcessor->sendStanzaOut(AStreamJid,error);
 			}
 			else
 			{
+				LOG_STRM_INFO(AStreamJid,QString("Phone call request accepted from=%1, call=%2").arg(AStanza.from(),callId));
 				Stanza result = FStanzaProcessor->makeReplyResult(AStanza);
 				FStanzaProcessor->sendStanzaOut(AStreamJid,result);
 			}
@@ -336,9 +345,16 @@ bool PhoneManager::phoneCallReceive(int AOrder, IPhoneCall *ACall)
 {
 	if (AOrder == PCHO_PHONEMANAGER)
 	{
-		QSet<IPhoneCall *> activeCalls = (phoneCalls(true).toSet()-=ACall);
+		QSet<IPhoneCall *> activeCalls = (phoneCalls(true).toSet() -= ACall);
 		if (activeCalls.isEmpty())
+		{
+			LOG_STRM_INFO(ACall->streamJid(),QString("Phone call received from=%1, call=%2").arg(ACall->contactJid().full(),ACall->callId()));
 			return showCallWindow(ACall);
+		}
+		else
+		{
+			LOG_STRM_WARNING(ACall->streamJid(),QString("Phone call not received from=%1, call=%2: Active calls found").arg(ACall->contactJid().full(),ACall->callId()));
+		}
 	}
 	return false;
 }
@@ -385,6 +401,7 @@ IPhoneCall *PhoneManager::newCall(const Jid &AStreamJid, const QString &ANumber)
 	if (AStreamJid.isValid() && isCallsEnabled() && isValidNumber(ANumber))
 	{
 		QString callId = QUuid::createUuid().toString();
+		LOG_STRM_INFO(AStreamJid,QString("Phone call created as caller, number=%1, call=%2").arg(ANumber,callId));
 		PhoneCall *call = new PhoneCall(this,FSipPhone,AStreamJid,callId,ANumber,this);
 		appendCall(call);
 		return call;
@@ -397,6 +414,7 @@ IPhoneCall *PhoneManager::newCall(const Jid &AStreamJid, const QSet<Jid> &ARecei
 	if (FStanzaProcessor && AStreamJid.isValid() && isCallsEnabled() && !AReceivers.isEmpty())
 	{
 		QString callId = QUuid::createUuid().toString();
+		LOG_STRM_INFO(AStreamJid,QString("Phone call created as caller, with=%1, call=%2").arg(AReceivers.toList().value(0).full(),callId));
 		PhoneCall *call = new PhoneCall(this,FSipPhone,FStanzaProcessor,AStreamJid,callId,AReceivers,this);
 		appendCall(call);
 		return call;
@@ -483,8 +501,19 @@ QString PhoneManager::saveCallHistoryItem(const Jid &AStreamJid, const IPhoneCal
 	if (FCallHistoryProperties.contains(AStreamJid.pBare()))
 	{
 		CallHistoryTaskSaveItem *task = new CallHistoryTaskSaveItem(AStreamJid,AItem);
-		FCallHistoryWorker->startTask(task);
-		return task->taskId();
+		if (FCallHistoryWorker->startTask(task))
+		{
+			LOG_STRM_DEBUG(AStreamJid,QString("Save phone call history item task started, id=%1, with=%2").arg(task->taskId(),AItem.with));
+			return task->taskId();
+		}
+		else
+		{
+			LOG_STRM_ERROR(AStreamJid,QString("Failed to start save phone call history item task, with=%1").arg(AItem.with));
+		}
+	}
+	else
+	{
+		REPORT_ERROR("Failed to save phone call history item: Stream not found");
 	}
 	return QString::null;
 }
@@ -494,8 +523,19 @@ QString PhoneManager::loadCallHistoryItems(const Jid &AStreamJid, const IPhoneCa
 	if (FCallHistoryProperties.contains(AStreamJid.pBare()))
 	{
 		CallHistoryTaskLoadItems *task = new CallHistoryTaskLoadItems(AStreamJid,ARequest);
-		FCallHistoryWorker->startTask(task);
-		return task->taskId();
+		if (FCallHistoryWorker->startTask(task))
+		{
+			LOG_STRM_DEBUG(AStreamJid,QString("Load phone call history items task started, id=%1, with=%2").arg(task->taskId(),ARequest.with));
+			return task->taskId();
+		}
+		else
+		{
+			LOG_STRM_ERROR(AStreamJid,QString("Failed to start load phone call history items task, with=%1").arg(ARequest.with));
+		}
+	}
+	else
+	{
+		REPORT_ERROR("Failed to load phone call history items: Stream not found");
 	}
 	return QString::null;
 }
@@ -505,8 +545,19 @@ QString PhoneManager::removeCallHistoryItems(const Jid &AStreamJid, const IPhone
 	if (FCallHistoryProperties.contains(AStreamJid.pBare()))
 	{
 		CallHistoryTaskRemoveItems *task = new CallHistoryTaskRemoveItems(AStreamJid,ARequest);
-		FCallHistoryWorker->startTask(task);
-		return task->taskId();
+		if (FCallHistoryWorker->startTask(task))
+		{
+			LOG_STRM_DEBUG(AStreamJid,QString("Remove phone call history items task started, id=%1, with=%2").arg(task->taskId(),ARequest.with));
+			return task->taskId();
+		}
+		else
+		{
+			LOG_STRM_ERROR(AStreamJid,QString("Failed to start remove phone call history items task, with=%1").arg(ARequest.with));
+		}
+	}
+	else
+	{
+		REPORT_ERROR("Failed to remove phone call history items: Stream not found");
 	}
 	return QString::null;
 }
@@ -664,8 +715,9 @@ Jid PhoneManager::findContactByNumber(const Jid &AStreamJid, const QString &ANum
 
 bool PhoneManager::appendContactNumber(const Jid &AStreamJid, const Jid &AContactJid, const QString &ANumber)
 {
-	if (isRosterContact(AStreamJid,AContactJid) && isValidNumber(ANumber) && isNumbersReady(AStreamJid))
+	if (isNumbersReady(AStreamJid) && isValidNumber(ANumber) && isRosterContact(AStreamJid,AContactJid))
 	{
+		LOG_STRM_INFO(AStreamJid,QString("Adding phone number to contact jid=%1, number=%2").arg(AContactJid.bare(),ANumber));
 		QString number = normalizedNumber(ANumber);
 		QStringList &numbers = FNumbers[AStreamJid][AContactJid.bare()];
 		if (!numbers.contains(number))
@@ -677,6 +729,10 @@ bool PhoneManager::appendContactNumber(const Jid &AStreamJid, const Jid &AContac
 		}
 		return true;
 	}
+	else
+	{
+		LOG_STRM_ERROR(AStreamJid,QString("Failed to add phone number to contact jid=%1, number=%2").arg(AContactJid.bare(),ANumber));
+	}
 	return false;
 }
 
@@ -684,6 +740,7 @@ bool PhoneManager::removeContactNumber(const Jid &AStreamJid, const Jid &AContac
 {
 	if (isNumbersReady(AStreamJid) && AContactJid.isValid())
 	{
+		LOG_STRM_INFO(AStreamJid,QString("Removing phone number from contact jid=%1, number=%1").arg(AContactJid.bare(),ANumber));
 		QString number = !ANumber.isNull() ? normalizedNumber(ANumber) : QString::null;
 		if (!number.isNull() && FNumbers.value(AStreamJid).value(AContactJid.bare()).contains(number))
 		{
@@ -715,12 +772,19 @@ QMultiMap<int,IPhoneCallHandler *> PhoneManager::callHandlers() const
 void PhoneManager::insertCallHandler(int AOrder, IPhoneCallHandler *AHandler)
 {
 	if (AHandler && !FCallHandlers.contains(AOrder,AHandler))
+	{
+		LOG_DEBUG(QString("Phone call handler inserted, order=%1, handler=%2").arg(AOrder).arg((quint64)AHandler));
 		FCallHandlers.insertMulti(AOrder,AHandler);
+	}
 }
 
 void PhoneManager::removeCallHandler(int AOrder, IPhoneCallHandler *AHandler)
 {
-	FCallHandlers.remove(AOrder,AHandler);
+	if (FCallHandlers.contains(AOrder,AHandler))
+	{
+		LOG_DEBUG(QString("Phone call handler removed, order=%1, handler=%2").arg(AOrder).arg((quint64)AHandler));
+		FCallHandlers.remove(AOrder,AHandler);
+	}
 }
 
 void PhoneManager::appendCall(IPhoneCall *ACall)
@@ -757,6 +821,7 @@ bool PhoneManager::processIncomingCall(const Jid &AStreamJid, const QString &ACa
 	bool callReceived = false;
 	if (FStanzaProcessor && isCallsEnabled())
 	{
+		LOG_STRM_INFO(AStreamJid,QString("Phone call created as receiver, uri=%1, call=%2").arg(ARemoteUri,ACallId));
 		PhoneCall *call = new PhoneCall(this,FSipPhone,FStanzaProcessor,AStreamJid,ACallId,AContactJid,ARemoteUri,AWithVideo,this);
 		appendCall(call);
 
@@ -765,9 +830,18 @@ bool PhoneManager::processIncomingCall(const Jid &AStreamJid, const QString &ACa
 
 		if (!callReceived)
 		{
+			LOG_STRM_INFO(AStreamJid,QString("Incoming phone call not received, uri=%1, call=%2").arg(ARemoteUri,ACallId));
 			call->hangupCall(IPhoneCall::Busy);
 			call->destroyCall(0);
 		}
+		else
+		{
+			LOG_STRM_INFO(AStreamJid,QString("Incoming phone call received, uri=%1, call=%2").arg(ARemoteUri,ACallId));
+		}
+	}
+	else if (FStanzaProcessor)
+	{
+		LOG_STRM_WARNING(AStreamJid,QString("Failed to process incoming call, uri=%1, call=%2: Calls is not enabled").arg(ARemoteUri,ACallId));
 	}
 	return callReceived;
 }
@@ -928,15 +1002,26 @@ void PhoneManager::startSaveNumbersToStorage(const Jid &AStreamJid)
 	}
 }
 
-bool PhoneManager::saveNumbersToStorage( const Jid &AStreamJid )
+bool PhoneManager::saveNumbersToStorage(const Jid &AStreamJid)
 {
 	if (FPrivateStorage && isNumbersReady(AStreamJid))
 	{
 		QDomDocument doc;
 		QDomElement itemsElem = doc.appendChild(doc.createElementNS(NS_STORAGE_PHONENUMBERS,"storage")).toElement();
 		saveNumbersToXml(itemsElem,streamNumbers(AStreamJid));
-		FPrivateStorage->saveData(AStreamJid,itemsElem);
-		return true;
+		if (!FPrivateStorage->saveData(AStreamJid,itemsElem).isEmpty())
+		{
+			LOG_STRM_DEBUG(AStreamJid,"Save phone numbers to storage request sent");
+			return true;
+		}
+		else
+		{
+			LOG_STRM_ERROR(AStreamJid,"Failed to send save phone numbers to storage request");
+		}
+	}
+	else if (FPrivateStorage)
+	{
+		LOG_STRM_ERROR(AStreamJid,"Failed to save phone numbers to storage: Stream is not ready");
 	}
 	return false;
 }
@@ -1011,7 +1096,10 @@ QHash<Jid, QStringList> PhoneManager::loadNumbersFromFile(const QString &AFileNa
 			numbers = loadNumbersFromXml(doc.documentElement());
 		file.close();
 	}
-
+	else if (file.exists())
+	{
+		REPORT_ERROR(QString("Failed to load phone numbers from file: %1").arg(file.errorString()));
+	}
 	return numbers;
 }
 
@@ -1025,6 +1113,10 @@ void PhoneManager::saveNumbersToFile(const QString &AFileName, const QHash<Jid, 
 		saveNumbersToXml(itemsElem,ANumbers);
 		file.write(doc.toByteArray());
 		file.close();
+	}
+	else
+	{
+		REPORT_ERROR(QString("Failed to save phone numbers to file: %1").arg(file.errorString()));
 	}
 }
 
@@ -1094,7 +1186,14 @@ void PhoneManager::onRosterAdded(IRoster *ARoster)
 {
 	CallHistoryTaskOpenDatabase *task = new CallHistoryTaskOpenDatabase(ARoster->streamJid(),phoneStreamFilePath(ARoster->streamJid(),FILE_CALLSHISTORY));
 	if (FCallHistoryWorker->startTask(task))
+	{
+		LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database open task started");
 		FPluginManager->delayShutdown();
+	}
+	else
+	{
+		LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database open task");
+	}
 
 	FNumbers.insert(ARoster->streamJid(),loadNumbersFromFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS)));
 	emit numbersStreamsChanged();
@@ -1106,7 +1205,10 @@ void PhoneManager::onRosterOpened(IRoster *ARoster)
 	if (FAvailCallStreams.count() == 1)
 	{
 		if (FSipPhone && !FSipPhone->availAccounts().isEmpty())
+		{
+			LOG_INFO("Phone calls enabled");
 			emit callsEnableChanged();
+		}
 	}
 
 	emit numbersReadyChanged(ARoster->streamJid(),true);
@@ -1118,7 +1220,10 @@ void PhoneManager::onRosterClosed(IRoster *ARoster)
 	if (FAvailCallStreams.count() == 0)
 	{
 		if (FSipPhone && !FSipPhone->availAccounts().isEmpty())
+		{
+			LOG_INFO("Phone calls disabled");
 			emit callsEnableChanged();
+		}
 	}
 
 	emit numbersReadyChanged(ARoster->streamJid(),false);
@@ -1128,7 +1233,14 @@ void PhoneManager::onRosterRemoved(IRoster *ARoster)
 {
 	CallHistoryTaskCloseDatabase *task = new CallHistoryTaskCloseDatabase(ARoster->streamJid());
 	if (FCallHistoryWorker->startTask(task))
+	{
+		LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database close task started");
 		FPluginManager->delayShutdown();
+	}
+	else
+	{
+		LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database close task");
+	}
 
 	saveNumbersToFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS),FNumbers.take(ARoster->streamJid()));
 	emit numbersStreamsChanged();
@@ -1150,21 +1262,32 @@ void PhoneManager::onRosterItemReceived(IRoster *ARoster, const IRosterItem &AIt
 
 void PhoneManager::onPrivateStorateOpened(const Jid &AStreamJid)
 {
-	FPrivateStorage->loadData(AStreamJid,"storage",NS_STORAGE_PHONENUMBERS);
+	if (!FPrivateStorage->loadData(AStreamJid,"storage",NS_STORAGE_PHONENUMBERS).isEmpty())
+		LOG_STRM_INFO(AStreamJid,"Phone numbers load request sent");
+	else
+		LOG_STRM_WARNING(AStreamJid,"Failed to send load phone numbers request");
 }
 
 void PhoneManager::onPrivateDataLoaded(const QString &AId, const Jid &AStreamJid, const QDomElement &AElement)
 {
 	Q_UNUSED(AId);
 	if (AElement.namespaceURI() == NS_STORAGE_PHONENUMBERS)
+	{
+		LOG_STRM_INFO(AStreamJid,"Phone numbers loaded from storage");
 		updateStreamNumbers(AStreamJid,loadNumbersFromXml(AElement));
+	}
 }
 
 void PhoneManager::onPrivateDataChanged(const Jid &AStreamJid, const QString &ATagName, const QString &ANamespace)
 {
 	Q_UNUSED(ATagName);
 	if (ANamespace == NS_STORAGE_PHONENUMBERS)
-		FPrivateStorage->loadData(AStreamJid,"storage",NS_STORAGE_PHONENUMBERS);
+	{
+		if (!FPrivateStorage->loadData(AStreamJid,"storage",NS_STORAGE_PHONENUMBERS).isEmpty())
+			LOG_STRM_INFO(AStreamJid,"Phone numbers reload request sent");
+		else
+			LOG_STRM_WARNING(AStreamJid,"Failed to send reload phone numbers request");
+	}
 }
 
 void PhoneManager::onMessageChatWindowActivated()
@@ -1203,7 +1326,10 @@ void PhoneManager::onPhoneCallDestroyed()
 {
 	IPhoneCall *call = qobject_cast<PhoneCall *>(sender());
 	if (call)
+	{
+		LOG_STRM_INFO(call->streamJid(),QString("Phone call destroyed, call=%1").arg(call->callId()));
 		removeCall(call);
+	}
 }
 
 void PhoneManager::onPhoneCallStateChanged()
@@ -1252,45 +1378,7 @@ void PhoneManager::onCallHistoryTaskFinished(CallHistoryTask *ATask)
 				CallHistoryTaskOpenDatabase *task = static_cast<CallHistoryTaskOpenDatabase *>(ATask);
 				FPluginManager->continueShutdown();
 				FCallHistoryProperties.insert(task->streamJid().pBare(),task->databaseProperties());
-
-				// Generate Call History
-				/*{
-					QDateTime fromDateTime(QDate(2000,1,1),QTime(0,0,0));
-					QDateTime toDateTime = QDateTime::currentDateTime();
-					int startInterval = fromDateTime.secsTo(toDateTime);
-
-					IRoster *roster = FRosterPlugin->findRoster(task->streamJid());
-					QList<IRosterItem> rosterItems = roster->rosterItems();
-					int withInterval = rosterItems.count()-1;
-
-					for (int i=0; i<1000; i++)
-					{
-						IPhoneCallHistoryItem item;
-
-						int startRnd = qRound((double)qrand()*startInterval/RAND_MAX);
-						item.start = fromDateTime.addSecs(startRnd);
-
-						if ((qrand() & 0x01)==0x01)
-						{
-							item.with = "+";
-							while (!isValidNumber(item.with))
-								item.with += QString::number(qrand());
-							item.isNumberCall = true;
-						}
-						else
-						{
-							int withRnd = qRound((double)qrand()*withInterval/RAND_MAX);
-							item.with = rosterItems.value(withRnd).itemJid.pBare();
-							item.isNumberCall = false;
-						}
-
-						item.duration = qrand()*1000;
-						item.role = (qrand() & 0x01)==0x01 ? IPhoneCall::Caller : IPhoneCall::Receiver;
-						item.hangupCode = qrand() % (IPhoneCall::ErrorOccured+1);
-
-						saveCallHistoryItem(task->streamJid(),item);
-					}
-				}*/
+				LOG_STRM_DEBUG(task->streamJid(),QString("Phone call history database opened, id=%1").arg(task->taskId()));
 			}
 			break;
 		case CallHistoryTask::CloseDatabase:
@@ -1298,23 +1386,27 @@ void PhoneManager::onCallHistoryTaskFinished(CallHistoryTask *ATask)
 				CallHistoryTaskCloseDatabase *task = static_cast<CallHistoryTaskCloseDatabase *>(ATask);
 				FPluginManager->continueShutdown();
 				FCallHistoryProperties.remove(task->streamJid().pBare());
+				LOG_STRM_DEBUG(task->streamJid(),QString("Phone call history database closed, id=%1").arg(task->taskId()));
 			}
 			break;
 		case CallHistoryTask::SaveHistoryItem:
 			{
 				CallHistoryTaskSaveItem *task = static_cast<CallHistoryTaskSaveItem *>(ATask);
+				LOG_STRM_DEBUG(task->streamJid(),QString("Phone call history item saved, id=%1").arg(task->taskId()));
 				emit callHistoryItemSaved(task->taskId(),task->savedItem());
 			}
 			break;
 		case CallHistoryTask::LoadHistoryItems:
 			{
 				CallHistoryTaskLoadItems *task =static_cast<CallHistoryTaskLoadItems *>(ATask);
+				LOG_STRM_DEBUG(task->streamJid(),QString("Phone call history items loaded, id=%1").arg(task->taskId()));
 				emit callHistoryItemsLoaded(task->taskId(),task->loadedItems());
 			}
 			break;
 		case CallHistoryTask::RemoveHistoryItems:
 			{
 				CallHistoryTaskRemoveItems *task = static_cast<CallHistoryTaskRemoveItems *>(ATask);
+				LOG_STRM_DEBUG(task->streamJid(),QString("Phone call history items removed, id=%1").arg(task->taskId()));
 				emit callHistoryItemsRemoved(task->taskId(),task->removeRequest());
 			}
 			break;
@@ -1322,6 +1414,7 @@ void PhoneManager::onCallHistoryTaskFinished(CallHistoryTask *ATask)
 	}
 	else
 	{
+		LOG_STRM_ERROR(ATask->streamJid(),QString("Failed to execute phone call history task, id=%1: %2").arg(ATask->taskId(),ATask->error().errorMessage()));
 		emit callHistoryRequestFailed(ATask->taskId(),ATask->error());
 	}
 	delete ATask;
@@ -1396,10 +1489,17 @@ void PhoneManager::onUpdateDefaultSipAccount()
 		config.proxyHost = Options::node(OPV_PHONEMANAGER_SIP_PROXYHOST).value().toString();
 		config.proxyPort = Options::node(OPV_PHONEMANAGER_SIP_PROXYPORT).value().toUInt();
 
+		LOG_INFO(QString("Updating default SIP account, id=%1").arg(defaultSipAccountId().toString()));
+
 		if (FSipPhone->availAccounts().contains(defaultSipAccountId()))
-			FSipPhone->updateAccount(defaultSipAccountId(),config);
-		else
+		{
+			if (config.userid.isEmpty() || !FSipPhone->updateAccount(defaultSipAccountId(),config))
+				FSipPhone->removeAccount(defaultSipAccountId());
+		}
+		else if (!config.userid.isEmpty())
+		{
 			FSipPhone->insertAccount(defaultSipAccountId(),config);
+		}
 	}
 }
 
@@ -1409,7 +1509,10 @@ void PhoneManager::onSipAccountInserted(const QUuid &AAccountId)
 	if (FSipPhone->availAccounts().count() == 1)
 	{
 		if (!FAvailCallStreams.isEmpty())
+		{
+			LOG_INFO("Phone calls enabled");
 			emit callsEnableChanged();
+		}
 	}
 }
 
@@ -1419,7 +1522,10 @@ void PhoneManager::onSipAccountRemoved(const QUuid &AAccountId)
 	if (FSipPhone->availAccounts().count() == 0)
 	{
 		if (!FAvailCallStreams.isEmpty())
+		{
+			LOG_INFO("Phone calls disabled");
 			emit callsEnableChanged();
+		}
 	}
 }
 

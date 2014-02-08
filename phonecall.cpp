@@ -5,6 +5,7 @@
 #include <definitions/phonemanager/internalerrors.h>
 #include <definitions/phonemanager/sipcallhandlerorders.h>
 #include <utils/options.h>
+#include <utils/logger.h>
 
 #define DIRECT_CALL_DOMAIN        "sip.qip.ru"
 #define CALL_REQUEST_TIMEOUT      15000
@@ -80,6 +81,8 @@ bool PhoneCall::stanzaReadWrite(int AHandleId, const Jid &AStreamJid, Stanza &AS
 	{
 		QDomElement actionElem = AStanza.firstElement("query",NS_VACUUM_SIP_PHONE).firstChildElement("action");
 		QString actionType =  actionElem.attribute("type");
+
+		LOG_STRM_INFO(AStreamJid,QString("Phone call action request received, from=%1, action=%2, call=%3").arg(AStanza.from(),actionType,FCallId));
 		if (role()==IPhoneCall::Caller && FActiveReceivers.contains(AStanza.from()))
 		{
 			AAccept = true;
@@ -176,6 +179,10 @@ bool PhoneCall::stanzaReadWrite(int AHandleId, const Jid &AStreamJid, Stanza &AS
 
 			FStanzaProcessor->sendStanzaOut(AStreamJid,reply);
 		}
+		else
+		{
+			LOG_STRM_WARNING(AStreamJid,QString("Failed to process received phone call action request from=%1, action=%2, call=%3: Unexpected request").arg(AStanza.from(),actionType,FCallId));
+		}
 	}
 	return false;
 }
@@ -186,6 +193,8 @@ void PhoneCall::stanzaRequestResult(const Jid &AStreamJid, const Stanza &AStanza
 	if (FCallRequests.contains(AStanza.id()))
 	{
 		Jid receiver = FCallRequests.take(AStanza.id());
+		LOG_STRM_INFO(AStreamJid,QString("Phone call request result received, from=%1, receiver=%2, type=%3, call=%4").arg(AStanza.from(),receiver.full(),AStanza.type(),FCallId));
+
 		if (role() == IPhoneCall::Caller)
 		{
 			if (AStanza.type() == "error")
@@ -294,6 +303,8 @@ bool PhoneCall::startCall(bool AWithVideo)
 {
 	if (role()==IPhoneCall::Caller && state()==IPhoneCall::Inited)
 	{
+		LOG_STRM_INFO(streamJid(),QString("Starting phone call, call=%1, video=%2").arg(FCallId).arg(AWithVideo));
+
 		FWithVideo = AWithVideo;
 		setMediaProperty(VideoCapture,Enabled,AWithVideo);
 		FStartTime = QDateTime::currentDateTime();
@@ -328,6 +339,11 @@ bool PhoneCall::startCall(bool AWithVideo)
 				{
 					FActiveReceivers += receiver;
 					FCallRequests.insert(request.id(), receiver);
+					LOG_STRM_INFO(streamJid(),QString("Phone call start request sent to=%1, id=%2, call=%3").arg(request.to(),request.id(),FCallId));
+				}
+				else
+				{
+					LOG_STRM_WARNING(streamJid(),QString("Failed to send phone call start request to=%1, call=%2").arg(request.to(),FCallId));
 				}
 			}
 
@@ -344,6 +360,8 @@ bool PhoneCall::startCall(bool AWithVideo)
 	}
 	else if (role()==IPhoneCall::Receiver && state()==IPhoneCall::Ringing)
 	{
+		LOG_STRM_INFO(streamJid(),QString("Starting phone call, call=%1, video=%2").arg(FCallId).arg(AWithVideo));
+
 		FWithVideo = AWithVideo;
 		setMediaProperty(VideoCapture,Enabled,AWithVideo);
 		FStartTime = QDateTime::currentDateTime();
@@ -371,6 +389,8 @@ bool PhoneCall::hangupCall(HangupCode ACode, const QString &AText)
 	{
 		FHangupCode = ACode;
 		FHangupText = AText;
+
+		LOG_STRM_INFO(streamJid(),QString("Hanging up phone call, code=%1, text=%2, call=%3").arg(ACode).arg(AText).arg(FCallId));
 
 		if (FSipCall)
 		{
@@ -420,6 +440,8 @@ bool PhoneCall::hangupCall(HangupCode ACode, const QString &AText)
 
 bool PhoneCall::destroyCall(unsigned long AWaitForDisconnected)
 {
+	LOG_STRM_INFO(streamJid(),QString("Destroying phone call, wait=%1, call=%2").arg(AWaitForDisconnected).arg(FCallId));
+
 	hangupCall(IPhoneCall::Decline);
 	
 	if (FSipCall)
@@ -444,6 +466,7 @@ bool PhoneCall::isVideoCallRequested() const
 
 QWidget *PhoneCall::getVideoPreviewWidget(QWidget *AParent) const
 {
+	LOG_STRM_DEBUG(streamJid(),QString("Phone call video preview widget requested, call=%1").arg(FCallId));
 	ISipDevice device = FSipPhone->findDevice(ISipMedia::Video,0);
 	return FSipPhone->startVideoPreview(device,AParent);
 }
@@ -452,8 +475,13 @@ QWidget *PhoneCall::getVideoPlaybackWidget(QWidget *AParent) const
 {
 	if (FSipCall)
 	{
+		LOG_STRM_DEBUG(streamJid(),QString("Phone call video playback widget requested, call=%1").arg(FCallId));
 		ISipMediaStream stream = FSipCall->mediaStreams(ISipMedia::Video).value(0);
 		return FSipCall->getVideoPlaybackWidget(stream.index,AParent);
+	}
+	else
+	{
+		REPORT_ERROR("Failed to get phone call video playback widget: SIP call not assigned");
 	}
 	return NULL;
 }
@@ -469,6 +497,8 @@ QVariant PhoneCall::mediaProperty(Media AMedia, MediaProperty AProperty) const
 			ISipMediaStream::Property sipProp;
 			if (getSipStreamParams(AMedia,IPhoneCall::Enabled,sipType,sipDir,sipProp))
 				return !FSipPhone->availDevices(sipType,sipDir).isEmpty();
+			else
+				REPORT_ERROR(QString("Failed to get phone call media property, media=%1, property=%2: SIP stream params not found").arg(AMedia).arg(AProperty));
 		}
 		break;
 	default:
@@ -487,6 +517,8 @@ bool PhoneCall::setMediaProperty(Media AMedia, MediaProperty AProperty, const QV
 	ISipMediaStream::Property sipProp;
 	if (getSipStreamParams(AMedia,AProperty,sipType,sipDir,sipProp))
 	{
+		LOG_STRM_DEBUG(streamJid(),QString("Changing phone call media property, media=%1, property=%2, value=%3, call=%4").arg(AMedia).arg(AProperty).arg(AValue.toString()).arg(FCallId));
+
 		if (FSipCall && FSipCall->isActive())
 		{
 			int dev = FSipCall->mediaStreams(sipType).value(0).index;
@@ -498,6 +530,10 @@ bool PhoneCall::setMediaProperty(Media AMedia, MediaProperty AProperty, const QV
 			emit mediaChanged();
 			return true;
 		}
+	}
+	else
+	{
+		REPORT_ERROR(QString("Failed to set phone call media property, media=%1, property=%2: SIP stream params not found").arg(AMedia).arg(AProperty));
 	}
 	return false;
 }
@@ -535,12 +571,15 @@ void PhoneCall::setSipCall(ISipCall *ASipCall)
 	connect(FSipCall->instance(),SIGNAL(mediaChanged()),SLOT(onSipCallMediaChanged()));
 	connect(FSipCall->instance(),SIGNAL(callDestroyed()),SLOT(onSipCallDestroyed()));
 	connect(FSipCall->instance(),SIGNAL(dtmfSent(const char *)),SIGNAL(dtmfSent(const char *)));
+	LOG_STRM_INFO(streamJid(),QString("SIP call assigned to phone call, call=%1, uri=%2").arg(FCallId,FSipCall->remoteUri()));
 }
 
 void PhoneCall::setState(State AState)
 {
 	if (FState < AState)
 	{
+		LOG_STRM_INFO(streamJid(),QString("Phone call state changed to=%1, call=%2").arg(AState).arg(FCallId));
+
 		FState = AState;
 		switch(FState)
 		{
@@ -559,6 +598,7 @@ void PhoneCall::setState(State AState)
 		default:
 			break;
 		}
+
 		FWaitRegistration = false;
 		emit stateChanged();
 	}
@@ -566,10 +606,14 @@ void PhoneCall::setState(State AState)
 
 bool PhoneCall::startAfterRegistration(bool ARegistered)
 {
+	LOG_STRM_INFO(streamJid(),QString("Continue phone call starting after registration on SIP server, registered=%1, call=%2").arg(ARegistered).arg(FCallId));
+
 	if (ARegistered)
 	{
 		if (role() == IPhoneCall::Caller)
 		{
+			LOG_STRM_INFO(streamJid(),QString("Creating SIP call for phone call, call=%1, uri=%2").arg(FCallId,FRemoteUri));
+
 			ISipCall *sipCall = FSipPhone->newCall(FSipAccountId,FRemoteUri);
 			if (sipCall)
 			{
@@ -583,21 +627,26 @@ bool PhoneCall::startAfterRegistration(bool ARegistered)
 		}
 		else if (role() == IPhoneCall::Receiver)
 		{
-			Stanza accept("iq");
-			accept.setTo(FContactJid.full()).setType("set").setId(FStanzaProcessor->newId());
+			Stanza stanza("iq");
+			stanza.setTo(FContactJid.full()).setType("set").setId(FStanzaProcessor->newId());
 
-			QDomElement queryElem = accept.addElement("query", NS_VACUUM_SIP_PHONE);
+			QDomElement queryElem = stanza.addElement("query", NS_VACUUM_SIP_PHONE);
 			queryElem.setAttribute("cid",FCallId);
-			QDomElement actionElem = queryElem.appendChild(accept.createElement("action")).toElement();
+			QDomElement actionElem = queryElem.appendChild(stanza.createElement("action")).toElement();
 			actionElem.setAttribute("type","accept");
 			actionElem.setAttribute("video",QVariant(FWithVideo).toString());
-			actionElem.appendChild(accept.createTextNode(FSipPhone->accountUri(FSipAccountId)));
+			actionElem.appendChild(stanza.createTextNode(FSipPhone->accountUri(FSipAccountId)));
 
-			if (FStanzaProcessor->sendStanzaRequest(this,FStreamJid,accept,CALL_REQUEST_TIMEOUT))
+			if (FStanzaProcessor->sendStanzaRequest(this,FStreamJid,stanza,CALL_REQUEST_TIMEOUT))
 			{
+				LOG_STRM_INFO(streamJid(),QString("Phone call accept request sent to=%1, id=%2, call=%3").arg(stanza.to(),stanza.id(),FCallId));
 				insertCallHandler();
-				FCallRequests.insert(accept.id(),FContactJid);
+				FCallRequests.insert(stanza.id(),FContactJid);
 				return true;
+			}
+			else
+			{
+				LOG_STRM_WARNING(streamJid(),QString("Failed to send phone call accept request to=%1, call=%2").arg(stanza.to(),FCallId));
 			}
 		}
 	}
@@ -612,17 +661,20 @@ void PhoneCall::sendNotifyAction(const QSet<Jid> &ARceivers, const QString &ATyp
 {
 	foreach(const Jid &receiver, ARceivers)
 	{
-		Stanza notify("iq");
-		notify.setTo(receiver.full()).setType("set").setId(FStanzaProcessor->newId());
+		Stanza stanza("iq");
+		stanza.setTo(receiver.full()).setType("set").setId(FStanzaProcessor->newId());
 
-		QDomElement queryElem = notify.addElement("query",NS_VACUUM_SIP_PHONE);
+		QDomElement queryElem = stanza.addElement("query",NS_VACUUM_SIP_PHONE);
 		queryElem.setAttribute("cid",FCallId);
 
-		QDomElement actionElem = queryElem.appendChild(notify.createElement("action")).toElement();
+		QDomElement actionElem = queryElem.appendChild(stanza.createElement("action")).toElement();
 		actionElem.setAttribute("type",AType);
-		actionElem.appendChild(notify.createTextNode(ADescription));
+		actionElem.appendChild(stanza.createTextNode(ADescription));
 
-		FStanzaProcessor->sendStanzaOut(FStreamJid,notify);
+		if (FStanzaProcessor->sendStanzaOut(FStreamJid,stanza))
+			LOG_STRM_INFO(streamJid(),QString("Phone call notification sent to=%1, action=%2, call=%3").arg(stanza.to(),AType,FCallId));
+		else
+			LOG_STRM_WARNING(streamJid(),QString("Failed to send phone call notification to=%1, action=%2, call=%3").arg(stanza.to(),AType,FCallId));
 	}
 }
 
@@ -716,7 +768,10 @@ void PhoneCall::removeStanzaHandler()
 void PhoneCall::onRingTimerTimeout()
 {
 	if (state()==IPhoneCall::Calling || state()==IPhoneCall::Ringing)
+	{
+		LOG_STRM_INFO(streamJid(),QString("Phone call ring timer timeout, call=%1").arg(FCallId));
 		hangupCall(IPhoneCall::NotAnswered);
+	}
 }
 
 void PhoneCall::onSipCallStateChanged()

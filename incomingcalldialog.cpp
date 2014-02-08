@@ -6,6 +6,7 @@
 #include <definitions/phonemanager/menuicons.h>
 #include <utils/iconstorage.h>
 #include <utils/filestorage.h>
+#include <utils/logger.h>
 #include <utils/menu.h>
 
 static const QString IncomingCallDialogStyleSheet =
@@ -51,6 +52,7 @@ static const QString IncomingCallDialogStyleSheet =
 
 IncomingCallDialog::IncomingCallDialog(IPhoneManager *APhoneManager, IPhoneCall *ACall, QWidget *AParent) : QDialog(AParent,Qt::WindowStaysOnTopHint)
 {
+	REPORT_VIEW;
 	ui.setupUi(this);
 	setAttribute(Qt::WA_DeleteOnClose,true);
 

@@ -4,9 +4,11 @@
 #include <definitions/resources.h>
 #include <definitions/phonemanager/menuicons.h>
 #include <utils/iconstorage.h>
+#include <utils/logger.h>
 
 CallHistoryWindow::CallHistoryWindow(IPhoneManager *APhoneManager, IPresencePlugin *APresencePlugin, IMessageProcessor *AMessageProcessor, QWidget *AParent) : QMainWindow(AParent)
 {
+	REPORT_VIEW;
 	ui.setupUi(this);
 	setAttribute(Qt::WA_DeleteOnClose,true);
 	IconStorage::staticStorage(RSR_STORAGE_MENUICONS)->insertAutoIcon(this,MNI_PHONEMANAGER_DIALER_DIALOG,0,0,"windowIcon");

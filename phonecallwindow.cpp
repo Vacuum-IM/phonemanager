@@ -6,10 +6,12 @@
 #include <utils/widgetmanager.h>
 #include <utils/iconstorage.h>
 #include <utils/options.h>
+#include <utils/logger.h>
 #include "phonecallwidget.h"
 
 PhoneCallWindow::PhoneCallWindow(IPhoneManager *APhoneManager, IPhoneCall *ACall, QWidget *AParent) : QWidget(AParent)
 {
+	REPORT_VIEW;
 	setAttribute(Qt::WA_DeleteOnClose,true);
 	IconStorage::staticStorage(RSR_STORAGE_MENUICONS)->insertAutoIcon(this,MNI_PHONEMANAGER_CALL,0,0,"windowIcon");
 

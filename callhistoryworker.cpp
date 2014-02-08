@@ -5,6 +5,7 @@
 #include <QMetaObject>
 #include <QMutexLocker>
 #include <definitions/phonemanager/internalerrors.h>
+#include <utils/logger.h>
 
 #define DATABASE_STRUCTURE_VERSION     1
 #define DATABASE_COMPATIBLE_VERSION    1
@@ -52,7 +53,9 @@ QString CallHistoryTask::databaseConnection() const
 
 void CallHistoryTask::setSQLError(const QSqlError &AError)
 {
-	FError = XmppError(IERR_PHONEMANAGER_HISTORY_DB_EXEC_FAILED,AError.databaseText());
+	QString text = !AError.databaseText().isEmpty() ? AError.databaseText() : AError.driverText();
+	FError = XmppError(IERR_PHONEMANAGER_HISTORY_DB_EXEC_FAILED,text);
+	Logger::reportError("CallHistoryTask",QString("Failed to execute SQL command: %1").arg(text),false);
 }
 
 
@@ -90,7 +93,10 @@ void CallHistoryTaskOpenDatabase::run()
 		}
 
 		if (!initialized)
+		{
 			QSqlDatabase::removeDatabase(connection);
+			Logger::reportError("CallHistoryTaskOpenDatabase",QString("Failed to initialize phone call history database: %1").arg(FError.errorMessage()),false);
+		}
 	}
 
 }
@@ -433,7 +439,7 @@ CallHistoryWorker::CallHistoryWorker(QObject *AParent) : QThread(AParent)
 	qRegisterMetaType<CallHistoryTask *>("CallHistoryTask *");
 }
 
-bool CallHistoryWorker::startTask( CallHistoryTask *ATask )
+bool CallHistoryWorker::startTask(CallHistoryTask *ATask)
 {
 	QMutexLocker locker(&FMutex);
 	if (!FQuit)

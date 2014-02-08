@@ -4,6 +4,7 @@
 #include <definitions/phonemanager/menuicons.h>
 #include <utils/widgetmanager.h>
 #include <utils/iconstorage.h>
+#include <utils/logger.h>
 
 static const QString PhoneDialerDialogStyleSheet =
 "QPushButton#pbtCall:enabled                "
@@ -26,6 +27,7 @@ static const QString PhoneDialerDialogStyleSheet =
 
 PhoneDialerDialog::PhoneDialerDialog(IPhoneManager *APhoneManager, QWidget *AParent) : QDialog(AParent)
 {
+	REPORT_VIEW;
 	ui.setupUi(this);
 	setAttribute(Qt::WA_DeleteOnClose,true);
 
