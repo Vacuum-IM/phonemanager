@@ -1091,10 +1091,17 @@ QHash<Jid, QStringList> PhoneManager::loadNumbersFromFile(const QString &AFileNa
 	QFile file(AFileName);
 	if (file.open(QIODevice::ReadOnly))
 	{
+		QString xmlError;
 		QDomDocument doc;
-		if (doc.setContent(file.readAll(),true))
+		if (doc.setContent(&file,true,&xmlError))
+		{
 			numbers = loadNumbersFromXml(doc.documentElement());
-		file.close();
+		}
+		else
+		{
+			REPORT_ERROR(QString("Failed to load phone numbers from file content: %1").arg(xmlError));
+			file.remove();
+		}
 	}
 	else if (file.exists())
 	{
