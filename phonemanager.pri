@@ -15,8 +15,7 @@ HEADERS = phonemanager.h \
           callhistoryworker.h \
           callhistoryviewwidget.h \
           callhistorystructmodel.h \
-          callhistorywindow.h \
-          sipaccountoptionswidget.h
+          callhistorywindow.h
 
 SOURCES = phonemanager.cpp \
           phonechathandler.cpp \
@@ -35,8 +34,7 @@ SOURCES = phonemanager.cpp \
           callhistoryworker.cpp \
           callhistoryviewwidget.cpp \
           callhistorystructmodel.cpp \
-          callhistorywindow.cpp \
-          sipaccountoptionswidget.cpp
+          callhistorywindow.cpp
 
 FORMS   = editnumberswidget.ui \
           callinfowidget.ui \
@@ -44,5 +42,4 @@ FORMS   = editnumberswidget.ui \
           incomingcalldialog.ui \
           dialerwidget.ui \
           phonedialerdialog.ui \
-          callhistorywindow.ui \
-          sipaccountoptionswidget.ui
+          callhistorywindow.ui

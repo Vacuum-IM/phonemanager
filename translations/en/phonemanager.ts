@@ -265,9 +265,6 @@
         <source>Voice and video calls over SIP</source>
         <translation>Voice and video calls over SIP</translation>
     </message>
-</context>
-<context>
-    <name>SipAccountOptionsWidget</name>
     <message>
         <source>Account</source>
         <translation>Account</translation>
@@ -297,8 +294,8 @@
         <translation>SIP Proxy:</translation>
     </message>
     <message>
-        <source>Media Streams</source>
-        <translation>Media Streams</translation>
+        <source>Media streams</source>
+        <translation>Media streams</translation>
     </message>
     <message>
         <source>STUN Server:</source>

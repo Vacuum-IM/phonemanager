@@ -2,9 +2,11 @@
 
 #include <QDir>
 #include <QFile>
+#include <QSpinBox>
 #include <definitions/resources.h>
 #include <definitions/notificationdataroles.h>
 #include <definitions/phonecallhandlerorders.h>
+#include <definitions/sipphone/optionvalues.h>
 #include <definitions/phonemanager/menuicons.h>
 #include <definitions/phonemanager/namespaces.h>
 #include <definitions/phonemanager/optionnodes.h>
@@ -36,8 +38,8 @@ PhoneManager::PhoneManager()
 	FSipPhone = NULL;
 	FAvatars = NULL;
 	FGateways = NULL;
-	FRosterPlugin = NULL;
-	FPresencePlugin = NULL;
+	FRosterManager = NULL;
+	FPresenceManager = NULL;
 	FPrivateStorage = NULL;
 	FPluginManager = NULL;
 	FMessageWidgets = NULL;
@@ -46,7 +48,7 @@ PhoneManager::PhoneManager()
 	FDiscovery = NULL;
 	FMainWindowPlugin = NULL;
 	FNotifications = NULL;
-	FMessageStyles = NULL;
+	FMessageStyleManager = NULL;
 	FOptionsManager = NULL;
 
 	FSHICallRequest = -1;
@@ -87,26 +89,25 @@ bool PhoneManager::initConnections(IPluginManager *APluginManager, int &AInitOrd
 	Q_UNUSED(AInitOrder);
 	FPluginManager = APluginManager;
 
-	IPlugin *plugin = APluginManager->pluginInterface("IRosterPlugin").value(0,NULL);
+	IPlugin *plugin = APluginManager->pluginInterface("IRosterManager").value(0,NULL);
 	if (plugin)
 	{
-		FRosterPlugin = qobject_cast<IRosterPlugin *>(plugin->instance());
-		if (FRosterPlugin)
+		FRosterManager = qobject_cast<IRosterManager *>(plugin->instance());
+		if (FRosterManager)
 		{
-			connect(FRosterPlugin->instance(),SIGNAL(rosterAdded(IRoster *)),SLOT(onRosterAdded(IRoster *)));
-			connect(FRosterPlugin->instance(),SIGNAL(rosterOpened(IRoster *)),SLOT(onRosterOpened(IRoster *)));
-			connect(FRosterPlugin->instance(),SIGNAL(rosterClosed(IRoster *)),SLOT(onRosterClosed(IRoster *)));
-			connect(FRosterPlugin->instance(),SIGNAL(rosterRemoved(IRoster *)),SLOT(onRosterRemoved(IRoster *)));
-			connect(FRosterPlugin->instance(),SIGNAL(rosterStreamJidChanged(IRoster *, const Jid &)),SLOT(onRosterStreamJidChanged(IRoster *, const Jid &)));
-			connect(FRosterPlugin->instance(),SIGNAL(rosterItemReceived(IRoster *, const IRosterItem &, const IRosterItem &)),
+			connect(FRosterManager->instance(),SIGNAL(rosterOpened(IRoster *)),SLOT(onRosterOpened(IRoster *)));
+			connect(FRosterManager->instance(),SIGNAL(rosterClosed(IRoster *)),SLOT(onRosterClosed(IRoster *)));
+			connect(FRosterManager->instance(),SIGNAL(rosterActiveChanged(IRoster *, bool)),SLOT(onRosterActiveChanged(IRoster *, bool)));
+			connect(FRosterManager->instance(),SIGNAL(rosterStreamJidChanged(IRoster *, const Jid &)),SLOT(onRosterStreamJidChanged(IRoster *, const Jid &)));
+			connect(FRosterManager->instance(),SIGNAL(rosterItemReceived(IRoster *, const IRosterItem &, const IRosterItem &)),
 				SLOT(onRosterItemReceived(IRoster *, const IRosterItem &, const IRosterItem &)));
 		}
 	}
 
-	plugin = APluginManager->pluginInterface("IPresencePlugin").value(0,NULL);
+	plugin = APluginManager->pluginInterface("IPresenceManager").value(0,NULL);
 	if (plugin)
 	{
-		FPresencePlugin = qobject_cast<IPresencePlugin *>(plugin->instance());
+		FPresenceManager = qobject_cast<IPresenceManager *>(plugin->instance());
 	}
 
 	plugin = APluginManager->pluginInterface("IAvatars").value(0,NULL);
@@ -192,10 +193,10 @@ bool PhoneManager::initConnections(IPluginManager *APluginManager, int &AInitOrd
 		}
 	}
 
-	plugin = APluginManager->pluginInterface("IMessageStyles").value(0,NULL);
+	plugin = APluginManager->pluginInterface("IMessageStyleManager").value(0,NULL);
 	if (plugin)
 	{
-		FMessageStyles = qobject_cast<IMessageStyles *>(plugin->instance());
+		FMessageStyleManager = qobject_cast<IMessageStyleManager *>(plugin->instance());
 	}
 
 	plugin = APluginManager->pluginInterface("IOptionsManager").value(0,NULL);
@@ -208,7 +209,7 @@ bool PhoneManager::initConnections(IPluginManager *APluginManager, int &AInitOrd
 	connect(Options::instance(),SIGNAL(optionsClosed()),SLOT(onOptionsClosed()));
 	connect(Options::instance(),SIGNAL(optionsChanged(const OptionsNode &)),SLOT(onOptionsChanged(const OptionsNode &)));
 
-	return FRosterPlugin!=NULL && FSipPhone!=NULL;
+	return FRosterManager!=NULL && FSipPhone!=NULL;
 }
 
 bool PhoneManager::initObjects()
@@ -270,12 +271,18 @@ bool PhoneManager::initObjects()
 bool PhoneManager::initSettings()
 {
 	Options::setDefaultValue(OPV_PHONEMANAGER_CALL_TIMEOUT,30000);
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_LOGIN,QString());
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_PASSWORD,QString());
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_SERVERHOST,QString());
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_SERVERPORT,0);
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_PROXYHOST,QString());
+	Options::setDefaultValue(OPV_PHONEMANAGER_SIP_PROXYPORT,0);
 
 	if (FSipPhone && FOptionsManager)
 	{
-		IOptionsDialogNode dnode = { ONO_PHONEMANAGER_SIPPHONE, OPN_PHONEMANAGER_SIPPHONE, tr("SIP Phone"), MNI_PHONEMANAGER_CALL };
+		IOptionsDialogNode dnode = { ONO_PHONEMANAGER_SIPPHONE, OPN_PHONEMANAGER_SIPPHONE, MNI_PHONEMANAGER_CALL, tr("SIP Phone") };
 		FOptionsManager->insertOptionsDialogNode(dnode);
-		FOptionsManager->insertOptionsHolder(this);
+		FOptionsManager->insertOptionsDialogHolder(this);
 	}
 	return true;
 }
@@ -331,12 +338,38 @@ bool PhoneManager::stanzaReadWrite(int AHandleId, const Jid &AStreamJid, Stanza 
 	return false;
 }
 
-QMultiMap<int, IOptionsWidget *> PhoneManager::optionsWidgets(const QString &ANodeId, QWidget *AParent)
+QMultiMap<int, IOptionsDialogWidget *> PhoneManager::optionsDialogWidgets(const QString &ANodeId, QWidget *AParent)
 {
-	QMultiMap<int, IOptionsWidget *> widgets;
-	if (ANodeId == OPN_PHONEMANAGER_SIPPHONE)
+	QMultiMap<int, IOptionsDialogWidget *> widgets;
+	if (FOptionsManager!=NULL && ANodeId==OPN_PHONEMANAGER_SIPPHONE)
 	{
-		widgets.insert(OWO_PHONEMANAGER_SIPPHONE, new SipAccountOptionsWidget(AParent));
+		widgets.insertMulti(OHO_PHONEMANAGER_SIP_ACCOUNT,FOptionsManager->newOptionsDialogHeader(tr("Account"),AParent));
+		
+		QLineEdit *lneLogin = new QLineEdit(AParent);
+		lneLogin->setPlaceholderText("user@sipserver.com");
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_LOGIN,FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_LOGIN),tr("Login:"),lneLogin,AParent));
+		
+		QLineEdit *lnePassword = new QLineEdit(AParent);
+		lnePassword->setEchoMode(QLineEdit::Password);
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_PASSWORD,FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_PASSWORD),tr("Password:"),lnePassword,AParent));
+
+		widgets.insertMulti(OHO_PHONEMANAGER_SIP_CONNECTION,FOptionsManager->newOptionsDialogHeader(tr("Connection"),AParent));
+		
+		IOptionsDialogWidget *odwServer = FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_SERVERHOST),tr("SIP Server:"),AParent);
+		QSpinBox *spbServerPort = new QSpinBox(odwServer->instance());
+		spbServerPort->setRange(0,65535);
+		odwServer->addChildOptionsWidget(FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_SERVERPORT),tr("Port:"),spbServerPort,odwServer->instance()));
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_SERVER,odwServer);
+
+		IOptionsDialogWidget *odwProxy = FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_PROXYHOST),tr("SIP Proxy:"),AParent);
+		QSpinBox *spbProxyPort = new QSpinBox(odwServer->instance());
+		spbProxyPort->setRange(0,65535);
+		odwProxy->addChildOptionsWidget(FOptionsManager->newOptionsDialogWidget(Options::node(OPV_PHONEMANAGER_SIP_PROXYPORT),tr("Port:"),spbProxyPort,odwServer->instance()));
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_PROXY,odwProxy);
+
+		widgets.insertMulti(OHO_PHONEMANAGER_SIP_MEDIA,FOptionsManager->newOptionsDialogHeader(tr("Media streams"),AParent));
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_STUNSERVER,FOptionsManager->newOptionsDialogWidget(Options::node(OPV_SIPPHONE_STUNSERVER),tr("STUN Server:"),AParent));
+		widgets.insertMulti(OWO_PHONEMANAGER_SIP_ICEENABLED,FOptionsManager->newOptionsDialogWidget(Options::node(OPV_SIPPHONE_ICEENABLED),tr("Enable ICE negotiation"),AParent));
 	}
 	return widgets;
 }
@@ -441,7 +474,7 @@ bool PhoneManager::showCallWindow(IPhoneCall *ACall)
 	foreach(const Jid &contactJid, contacts)
 	{
 		Jid streamJid = ACall->streamJid();
-		if (FRosterPlugin!=NULL && !isRosterContact(streamJid,contactJid))
+		if (FRosterManager!=NULL && !isRosterContact(streamJid,contactJid))
 		{
 			foreach(const Jid &stream, FNumbers.keys())
 			{
@@ -565,7 +598,7 @@ QString PhoneManager::removeCallHistoryItems(const Jid &AStreamJid, const IPhone
 void PhoneManager::showCallHistoryWindow()
 {
 	if (FCallHistoryWindow.isNull())
-		FCallHistoryWindow = new CallHistoryWindow(this,FPresencePlugin,FMessageProcessor);
+		FCallHistoryWindow = new CallHistoryWindow(this,FPresenceManager,FMessageProcessor);
 	WidgetManager::showActivateRaiseWindow(FCallHistoryWindow);
 }
 
@@ -584,8 +617,8 @@ QString PhoneManager::callContactName(IPhoneCall *ACall) const
 	Jid contactJid = callContactJid(ACall);
 	if (!contactJid.isEmpty())
 	{
-		IRoster *roster = FRosterPlugin!=NULL ? FRosterPlugin->findRoster(ACall->streamJid()) : NULL;
-		IRosterItem ritem = roster!=NULL ? roster->rosterItem(contactJid) : IRosterItem();
+		IRoster *roster = FRosterManager!=NULL ? FRosterManager->findRoster(ACall->streamJid()) : NULL;
+		IRosterItem ritem = roster!=NULL ? roster->findItem(contactJid) : IRosterItem();
 		return !ritem.name.isEmpty() ? ritem.name : contactJid.uBare();
 	}
 	else if (ACall->isNumberCall())
@@ -600,8 +633,8 @@ QString PhoneManager::callContactName(const Jid &AStreamJid, const IPhoneCallHis
 	Jid contactJid = AItem.isNumberCall ? findContactByNumber(AStreamJid,AItem.with) : Jid(AItem.with);
 	if (!contactJid.isEmpty())
 	{
-		IRoster *roster = FRosterPlugin!=NULL ? FRosterPlugin->findRoster(AStreamJid) : NULL;
-		IRosterItem ritem = roster!=NULL ? roster->rosterItem(contactJid) : IRosterItem();
+		IRoster *roster = FRosterManager!=NULL ? FRosterManager->findRoster(AStreamJid) : NULL;
+		IRosterItem ritem = roster!=NULL ? roster->findItem(contactJid) : IRosterItem();
 		return !ritem.name.isEmpty() ? ritem.name : contactJid.uBare();
 	}
 	else if (AItem.isNumberCall)
@@ -699,8 +732,8 @@ QStringList PhoneManager::contactNumbers(const Jid &AStreamJid, const Jid &ACont
 
 bool PhoneManager::isRosterContact(const Jid &AStreamJid, const Jid &AContactJid) const
 {
-	IRoster *roster = FRosterPlugin!=NULL ? FRosterPlugin->findRoster(AStreamJid) : NULL;
-	return roster!=NULL ? roster->rosterItem(AContactJid).isValid : false;
+	IRoster *roster = FRosterManager!=NULL ? FRosterManager->findRoster(AStreamJid) : NULL;
+	return roster!=NULL ? !roster->findItem(AContactJid).isNull() : false;
 }
 
 Jid PhoneManager::findContactByNumber(const Jid &AStreamJid, const QString &ANumber) const
@@ -858,7 +891,7 @@ void PhoneManager::showCallNotification(IPhoneCall *ACall)
 
 	QString userNick;
 	if (contactJid.isValid())
-		userNick = FMessageStyles!=NULL ? FMessageStyles->contactName(ACall->streamJid(),contactJid) : contactJid.uNode();
+		userNick = FMessageStyleManager!=NULL ? FMessageStyleManager->contactName(ACall->streamJid(),contactJid) : contactJid.uNode();
 	else if (ACall->isNumberCall())
 		userNick = formattedNumber(ACall->number());
 
@@ -979,12 +1012,12 @@ void PhoneManager::showFinishedCallNotification(IPhoneCall *ACall, const QString
 	IMessageChatWindow *window = chatHandler!=NULL ? chatHandler->messageWindow() : NULL;
 	if (window && window->viewWidget())
 	{
-		IMessageContentOptions options;
-		options.kind = IMessageContentOptions::KindStatus;
-		options.type |= IMessageContentOptions::TypeNotification;
-		options.direction = IMessageContentOptions::DirectionIn;
+		IMessageStyleContentOptions options;
+		options.kind = IMessageStyleContentOptions::KindStatus;
+		options.type |= IMessageStyleContentOptions::TypeNotification;
+		options.direction = IMessageStyleContentOptions::DirectionIn;
 		options.time = QDateTime::currentDateTime();
-		options.timeFormat = FMessageStyles!=NULL ? FMessageStyles->timeFormat(options.time) : QString::null;
+		options.timeFormat = FMessageStyleManager!=NULL ? FMessageStyleManager->timeFormat(options.time) : QString::null;
 
 		QUrl iconFile = QUrl::fromLocalFile(IconStorage::staticStorage(RSR_STORAGE_MENUICONS)->fileFullName(AIconId));
 		QString html = QString("<span><img src='%1'/> %2</span>").arg(iconFile.toString()).arg(Qt::escape(ANotify));
@@ -1189,23 +1222,6 @@ PhoneChatHandler *PhoneManager::getChatHandler(const Jid &AStreamJid, const Jid 
 	return handler;
 }
 
-void PhoneManager::onRosterAdded(IRoster *ARoster)
-{
-	CallHistoryTaskOpenDatabase *task = new CallHistoryTaskOpenDatabase(ARoster->streamJid(),phoneStreamFilePath(ARoster->streamJid(),FILE_CALLSHISTORY));
-	if (FCallHistoryWorker->startTask(task))
-	{
-		LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database open task started");
-		FPluginManager->delayShutdown();
-	}
-	else
-	{
-		LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database open task");
-	}
-
-	FNumbers.insert(ARoster->streamJid(),loadNumbersFromFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS)));
-	emit numbersStreamsChanged();
-}
-
 void PhoneManager::onRosterOpened(IRoster *ARoster)
 {
 	FAvailCallStreams.append(ARoster->streamJid());
@@ -1236,20 +1252,36 @@ void PhoneManager::onRosterClosed(IRoster *ARoster)
 	emit numbersReadyChanged(ARoster->streamJid(),false);
 }
 
-void PhoneManager::onRosterRemoved(IRoster *ARoster)
+void PhoneManager::onRosterActiveChanged(IRoster *ARoster, bool AActive)
 {
-	CallHistoryTaskCloseDatabase *task = new CallHistoryTaskCloseDatabase(ARoster->streamJid());
-	if (FCallHistoryWorker->startTask(task))
+	if (AActive)
 	{
-		LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database close task started");
-		FPluginManager->delayShutdown();
+		CallHistoryTaskOpenDatabase *task = new CallHistoryTaskOpenDatabase(ARoster->streamJid(),phoneStreamFilePath(ARoster->streamJid(),FILE_CALLSHISTORY));
+		if (FCallHistoryWorker->startTask(task))
+		{
+			LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database open task started");
+			FPluginManager->delayShutdown();
+		}
+		else
+		{
+			LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database open task");
+		}
+		FNumbers.insert(ARoster->streamJid(),loadNumbersFromFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS)));
 	}
 	else
 	{
-		LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database close task");
+		CallHistoryTaskCloseDatabase *task = new CallHistoryTaskCloseDatabase(ARoster->streamJid());
+		if (FCallHistoryWorker->startTask(task))
+		{
+			LOG_STRM_DEBUG(ARoster->streamJid(),"Phone calls history database close task started");
+			FPluginManager->delayShutdown();
+		}
+		else
+		{
+			LOG_STRM_ERROR(ARoster->streamJid(),"Failed to start phone calls history database close task");
+		}
+		saveNumbersToFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS),FNumbers.take(ARoster->streamJid()));
 	}
-
-	saveNumbersToFile(phoneStreamFilePath(ARoster->streamJid(),FILE_NUMBERS),FNumbers.take(ARoster->streamJid()));
 	emit numbersStreamsChanged();
 }
 
@@ -1360,7 +1392,7 @@ void PhoneManager::onSaveNumbersTimerTimeout()
 		if (saveNumbersToStorage(*it))
 			it = FSaveNumbersStreams.erase(it);
 		else
-			it++;
+			++it;
 	}
 }
 

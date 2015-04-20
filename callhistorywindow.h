@@ -3,7 +3,7 @@
 
 #include <QMainWindow>
 #include <interfaces/iphonemanager.h>
-#include <interfaces/ipresence.h>
+#include <interfaces/ipresencemanager.h>
 #include <interfaces/imessageprocessor.h>
 #include "callhistoryviewwidget.h"
 #include "callhistorystructmodel.h"
@@ -14,7 +14,7 @@ class CallHistoryWindow :
 {
 	Q_OBJECT;
 public:
-	CallHistoryWindow(IPhoneManager *APhoneManager, IPresencePlugin *APresencePlugin, IMessageProcessor *AMessageProcessor, QWidget *AParent = NULL);
+	CallHistoryWindow(IPhoneManager *APhoneManager, IPresenceManager *APresenceManager, IMessageProcessor *AMessageProcessor, QWidget *AParent = NULL);
 	~CallHistoryWindow();
 	void updateHistoryView() const;
 	void updateHistoryStruct() const;
@@ -29,7 +29,7 @@ private:
 	Ui::CallHistoryWindow ui;
 private:
 	IPhoneManager *FPhoneManager;
-	IPresencePlugin *FPresencePlugin;
+	IPresenceManager *FPresenceManager;
 	IMessageProcessor *FMessageProcessor;
 private:
 	CallHistoryStructModel *FHistoryModel;

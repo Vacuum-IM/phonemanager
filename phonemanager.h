@@ -5,8 +5,8 @@
 #include <QPointer>
 #include <interfaces/ipluginmanager.h>
 #include <interfaces/iphonemanager.h>
-#include <interfaces/iroster.h>
-#include <interfaces/ipresence.h>
+#include <interfaces/irostermanager.h>
+#include <interfaces/ipresencemanager.h>
 #include <interfaces/isipphone.h>
 #include <interfaces/iavatars.h>
 #include <interfaces/igateways.h>
@@ -18,7 +18,7 @@
 #include <interfaces/imainwindow.h>
 #include <interfaces/inotifications.h>
 #include <interfaces/irostersview.h>
-#include <interfaces/imessagestyles.h>
+#include <interfaces/imessagestylemanager.h>
 #include <interfaces/ioptionsmanager.h>
 #include "phonecall.h"
 #include "phonechathandler.h"
@@ -26,7 +26,6 @@
 #include "phonecallwindow.h"
 #include "callhistoryworker.h"
 #include "callhistorywindow.h"
-#include "sipaccountoptionswidget.h"
 
 struct CallNotifyData {
 	bool isNumber;
@@ -40,11 +39,11 @@ class PhoneManager :
 	public IPlugin,
 	public IPhoneManager,
 	public IStanzaHandler,
-	public IOptionsHolder,
+	public IOptionsDialogHolder,
 	public IPhoneCallHandler
 {
 	Q_OBJECT;
-	Q_INTERFACES(IPlugin IPhoneManager IPhoneCallHandler IOptionsHolder IStanzaHandler);
+	Q_INTERFACES(IPlugin IPhoneManager IPhoneCallHandler IOptionsDialogHolder IStanzaHandler);
 public:
 	PhoneManager();
 	~PhoneManager();
@@ -59,7 +58,7 @@ public:
 	// IStanzaHandler
 	virtual bool stanzaReadWrite(int AHandleId, const Jid &AStreamJid, Stanza &AStanza, bool &AAccept);
 	// IOptionsHolder
-	virtual QMultiMap<int, IOptionsWidget *> optionsWidgets(const QString &ANodeId, QWidget *AParent);
+	virtual QMultiMap<int, IOptionsDialogWidget *> optionsDialogWidgets(const QString &ANodeId, QWidget *AParent);
 	// IPhoneCallHandler
 	virtual bool phoneCallReceive(int AOrder, IPhoneCall *ACall);
 	// Calls
@@ -140,10 +139,9 @@ protected:
 	PhoneChatHandler *findChatHandler(const Jid &AStreamJid, const Jid &AContactJid) const;
 	PhoneChatHandler *getChatHandler(const Jid &AStreamJid, const Jid &AContactJid);
 protected slots:
-	void onRosterAdded(IRoster *ARoster);
 	void onRosterOpened(IRoster *ARoster);
 	void onRosterClosed(IRoster *ARoster);
-	void onRosterRemoved(IRoster *ARoster);
+	void onRosterActiveChanged(IRoster *ARoster, bool AActive);
 	void onRosterStreamJidChanged(IRoster *ARoster, const Jid &ABefore);
 	void onRosterItemReceived(IRoster *ARoster, const IRosterItem &AItem, const IRosterItem &ABefore);
 protected slots:
@@ -179,8 +177,8 @@ private:
 	ISipPhone *FSipPhone;
 	IAvatars *FAvatars;
 	IGateways *FGateways;
-	IRosterPlugin *FRosterPlugin;
-	IPresencePlugin *FPresencePlugin;
+	IRosterManager *FRosterManager;
+	IPresenceManager *FPresenceManager;
 	IPrivateStorage *FPrivateStorage;
 	IPluginManager *FPluginManager;
 	IMessageWidgets *FMessageWidgets;
@@ -189,7 +187,7 @@ private:
 	IServiceDiscovery *FDiscovery;
 	IMainWindowPlugin *FMainWindowPlugin;
 	INotifications *FNotifications;
-	IMessageStyles *FMessageStyles;
+	IMessageStyleManager *FMessageStyleManager;
 	IOptionsManager *FOptionsManager;
 private:
 	int FSHICallRequest;

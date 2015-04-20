@@ -42,5 +42,5 @@ set(UIS addnumberwidget.ui
         callcontrolwidget.ui
         incomingcalldialog.ui
         dialerwidget.ui
-        phonedialerdialor.ui
+        phonedialerdialog.ui
         callhistorywindow.ui)

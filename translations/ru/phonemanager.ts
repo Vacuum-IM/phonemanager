@@ -265,9 +265,6 @@
         <source>Voice and video calls over SIP</source>
         <translation>Голосовые и видео звонки через SIP</translation>
     </message>
-</context>
-<context>
-    <name>SipAccountOptionsWidget</name>
     <message>
         <source>Account</source>
         <translation>Аккаунт</translation>
@@ -297,7 +294,7 @@
         <translation>SIP прокси:</translation>
     </message>
     <message>
-        <source>Media Streams</source>
+        <source>Media streams</source>
         <translation>Медиа потоки</translation>
     </message>
     <message>

@@ -284,7 +284,7 @@ void CallHistoryTaskLoadItems::run()
 		if (FRequest.filtering & IPhoneCallHistoryRequest::FilterNumberCalls)
 		{
 			conditions.append("(is_number_call = ?)");
-			bindValues.append(true);
+			bindValues.append(true); //-V601
 		}
 		if (FRequest.filtering & IPhoneCallHistoryRequest::FilterDirectCalls)
 		{

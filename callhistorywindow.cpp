@@ -6,7 +6,7 @@
 #include <utils/iconstorage.h>
 #include <utils/logger.h>
 
-CallHistoryWindow::CallHistoryWindow(IPhoneManager *APhoneManager, IPresencePlugin *APresencePlugin, IMessageProcessor *AMessageProcessor, QWidget *AParent) : QMainWindow(AParent)
+CallHistoryWindow::CallHistoryWindow(IPhoneManager *APhoneManager, IPresenceManager *APresenceManager, IMessageProcessor *AMessageProcessor, QWidget *AParent) : QMainWindow(AParent)
 {
 	REPORT_VIEW;
 	ui.setupUi(this);
@@ -17,7 +17,7 @@ CallHistoryWindow::CallHistoryWindow(IPhoneManager *APhoneManager, IPresencePlug
 	ui.sprSplitter->setStretchFactor(1,5);
 
 	FPhoneManager = APhoneManager;
-	FPresencePlugin = APresencePlugin;
+	FPresenceManager = APresenceManager;
 	FMessageProcessor = AMessageProcessor;
 
 	ui.wdtHistoryItems->setLayout(new QVBoxLayout);
@@ -140,7 +140,7 @@ void CallHistoryWindow::onHistoryViewItemDoubleClicked(const QModelIndex &AIndex
 		if (!item.isNumberCall)
 		{
 			QSet<Jid> receivers;
-			IPresence *presence = FPresencePlugin!=NULL ? FPresencePlugin->findPresence(streamJid) : NULL;
+			IPresence *presence = FPresenceManager!=NULL ? FPresenceManager->findPresence(streamJid) : NULL;
 			QList<IPresenceItem> pItems = presence!=NULL ? presence->findItems(item.with) : QList<IPresenceItem>();
 			foreach(const IPresenceItem &pitem, pItems)
 			{
