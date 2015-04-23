@@ -1,0 +1,6 @@
+[main]
+host = https://www.transifex.com
+
+[vacuum-im.phonemanagerts]
+file_filter = <lang>/phonemanager.ts
+source_lang = ru
