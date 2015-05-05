@@ -294,7 +294,6 @@ void PhoneCallLayout::restoreLocalVideoGeometry()
 {
 	if (FLocalVideo)
 	{
-		Qt::Alignment align = Qt::AlignRight|Qt::AlignBottom;
 		FLocalScale = Options::fileValue("phonemanager.phonecallwindow.layout.localvideo.scale").toRectF();
 		if (FLocalScale.isNull())
 		{
