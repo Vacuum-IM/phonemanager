@@ -1,5 +1,6 @@
 #include "phonecall.h"
 
+#include <definitions/stanzahandlerorders.h>
 #include <definitions/phonemanager/namespaces.h>
 #include <definitions/phonemanager/optionvalues.h>
 #include <definitions/phonemanager/internalerrors.h>
@@ -325,8 +326,8 @@ bool PhoneCall::startCall(bool AWithVideo)
 		{
 			foreach(const Jid &receiver, FReceivers)
 			{
-				Stanza request("iq");
-				request.setTo(receiver.full()).setType("set").setId(FStanzaProcessor->newId());
+				Stanza request(STANZA_KIND_IQ);
+				request.setTo(receiver.full()).setType(STANZA_TYPE_SET).setUniqueId();
 
 				QDomElement queryElem = request.addElement("query", NS_VACUUM_SIP_PHONE);
 				queryElem.setAttribute("cid",FCallId);
@@ -627,8 +628,8 @@ bool PhoneCall::startAfterRegistration(bool ARegistered)
 		}
 		else if (role() == IPhoneCall::Receiver)
 		{
-			Stanza stanza("iq");
-			stanza.setTo(FContactJid.full()).setType("set").setId(FStanzaProcessor->newId());
+			Stanza stanza(STANZA_KIND_IQ);
+			stanza.setTo(FContactJid.full()).setType(STANZA_TYPE_SET).setUniqueId();
 
 			QDomElement queryElem = stanza.addElement("query", NS_VACUUM_SIP_PHONE);
 			queryElem.setAttribute("cid",FCallId);
@@ -661,8 +662,8 @@ void PhoneCall::sendNotifyAction(const QSet<Jid> &ARceivers, const QString &ATyp
 {
 	foreach(const Jid &receiver, ARceivers)
 	{
-		Stanza stanza("iq");
-		stanza.setTo(receiver.full()).setType("set").setId(FStanzaProcessor->newId());
+		Stanza stanza(STANZA_KIND_IQ);
+		stanza.setTo(receiver.full()).setType(STANZA_TYPE_SET).setUniqueId();
 
 		QDomElement queryElem = stanza.addElement("query",NS_VACUUM_SIP_PHONE);
 		queryElem.setAttribute("cid",FCallId);

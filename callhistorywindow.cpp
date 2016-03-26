@@ -164,7 +164,7 @@ void CallHistoryWindow::onHistoryViewItemDoubleClicked(const QModelIndex &AIndex
 		else if (FMessageProcessor)
 		{
 			Jid contactJid = item.isNumberCall ? FPhoneManager->findContactByNumber(streamJid,item.with) : Jid(item.with);
-			FMessageProcessor->createMessageWindow(streamJid,contactJid,Message::Chat,IMessageHandler::SM_SHOW);
+			FMessageProcessor->getMessageWindow(streamJid,contactJid,Message::Chat,IMessageProcessor::ActionShowNormal);
 		}
 	}
 }

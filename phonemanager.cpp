@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QSpinBox>
 #include <definitions/resources.h>
+#include <definitions/stanzahandlerorders.h>
 #include <definitions/notificationdataroles.h>
 #include <definitions/phonecallhandlerorders.h>
 #include <definitions/sipphone/optionvalues.h>
@@ -650,9 +651,9 @@ QImage PhoneManager::callContactAvatarImage(IPhoneCall *ACall, const QSize &AMax
 	if (FAvatars)
 	{
 		QString hash = FAvatars->avatarHash(callContactJid(ACall));
-		avatar = FAvatars->loadAvatarImage(hash,AMaxSize,AGray);
+		avatar = FAvatars->loadAvatarImage(hash,AMaxSize.width(),AGray);
 		if (avatar.isNull())
-			avatar = FAvatars->emptyAvatarImage(AMaxSize,AGray);
+			avatar = FAvatars->emptyAvatarImage(AMaxSize.width(),AGray);
 	}
 	return avatar;
 }
@@ -1216,7 +1217,7 @@ PhoneChatHandler *PhoneManager::getChatHandler(const Jid &AStreamJid, const Jid 
 	PhoneChatHandler *handler = findChatHandler(AStreamJid,AContactJid);
 	if (handler == NULL)
 	{
-		if (FMessageProcessor->createMessageWindow(AStreamJid,AContactJid,Message::Chat,IMessageHandler::SM_ASSIGN))
+		if (FMessageProcessor->getMessageWindow(AStreamJid,AContactJid,Message::Chat,IMessageProcessor::ActionAssign))
 			handler = findChatHandler(AStreamJid,AContactJid);
 	}
 	return handler;
