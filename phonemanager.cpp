@@ -774,7 +774,7 @@ bool PhoneManager::removeContactNumber(const Jid &AStreamJid, const Jid &AContac
 {
 	if (isNumbersReady(AStreamJid) && AContactJid.isValid())
 	{
-		LOG_STRM_INFO(AStreamJid,QString("Removing phone number from contact jid=%1, number=%1").arg(AContactJid.bare(),ANumber));
+		LOG_STRM_INFO(AStreamJid,QString("Removing phone number from contact jid=%1, number=%2").arg(AContactJid.bare(),ANumber));
 		QString number = !ANumber.isNull() ? normalizedNumber(ANumber) : QString::null;
 		if (!number.isNull() && FNumbers.value(AStreamJid).value(AContactJid.bare()).contains(number))
 		{
